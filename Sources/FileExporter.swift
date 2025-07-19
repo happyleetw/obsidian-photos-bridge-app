@@ -1,6 +1,7 @@
 import Foundation
 import Photos
 import UniformTypeIdentifiers
+import AppKit
 
 class FileExporter {
     static let shared = FileExporter()
@@ -37,38 +38,50 @@ class FileExporter {
         options.deliveryMode = .highQualityFormat
         options.isNetworkAccessAllowed = true
         
-        imageManager.requestImageDataAndOrientation(for: asset, options: options) { data, dataUTI, _, info in
-            guard let data = data else {
-                completion(ExportResponse(success: false, filePath: nil, originalFilename: nil, error: "Failed to get image data"))
+        // Request image as NSImage for consistent JPEG conversion
+        imageManager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .aspectFit, options: options) { image, info in
+            guard let image = image else {
+                completion(ExportResponse(success: false, filePath: nil, originalFilename: nil, error: "Failed to get image"))
                 return
             }
             
-            // Determine file extension from UTI
-            let fileExtension: String
-            if let dataUTI = dataUTI {
-                fileExtension = self.getFileExtension(from: dataUTI)
-            } else {
-                fileExtension = "jpg" // fallback
+            // Convert to JPEG data with high quality
+            guard let tiffData = image.tiffRepresentation,
+                  let bitmapImage = NSBitmapImageRep(data: tiffData),
+                  let jpegData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else {
+                completion(ExportResponse(success: false, filePath: nil, originalFilename: nil, error: "Failed to convert image to JPEG"))
+                return
             }
             
-            // Generate filename
+            // Always use .jpg extension for consistency
+            let fileExtension = "jpg"
+            
+            // Generate filename with .jpg extension
             let finalFilename: String
             if let customFilename = filename {
-                finalFilename = customFilename.hasSuffix(".\(fileExtension)") ? customFilename : "\(customFilename).\(fileExtension)"
+                // Remove existing extension and add .jpg
+                let nameWithoutExtension = customFilename.components(separatedBy: ".").first ?? customFilename
+                finalFilename = "\(nameWithoutExtension).\(fileExtension)"
             } else {
                 let originalFilename = asset.value(forKey: "filename") as? String
-                finalFilename = originalFilename ?? self.generateFilename(for: asset, extension: fileExtension)
+                if let original = originalFilename {
+                    // Remove existing extension and add .jpg
+                    let nameWithoutExtension = original.components(separatedBy: ".").first ?? original
+                    finalFilename = "\(nameWithoutExtension).\(fileExtension)"
+                } else {
+                    finalFilename = self.generateFilename(for: asset, extension: fileExtension)
+                }
             }
             
             // Write to destination
             let destinationURL = URL(fileURLWithPath: destinationPath).appendingPathComponent(finalFilename)
             
             do {
-                try data.write(to: destinationURL)
+                try jpegData.write(to: destinationURL)
                 completion(ExportResponse(
                     success: true,
                     filePath: destinationURL.path,
-                    originalFilename: asset.value(forKey: "filename") as? String,
+                    originalFilename: finalFilename, // Return the actual saved filename
                     error: nil
                 ))
             } catch {
