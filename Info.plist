@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 基本應用程式資訊 -->
+	<key>CFBundleExecutable</key>
+	<string>ObsidianPhotosBridge</string>
+	
+	<key>CFBundleIdentifier</key>
+	<string>com.obsidian.photos-bridge</string>
+	
+	<key>CFBundleName</key>
+	<string>Obsidian Photos Bridge</string>
+	
+	<key>CFBundleDisplayName</key>
+	<string>Obsidian Photos Bridge</string>
+	
+	<key>CFBundleVersion</key>
+	<string>1.0.0</string>
+	
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	
+	<key>CFBundleSignature</key>
+	<string>OPB1</string>
+	
+	<!-- 系統需求 -->
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	
+	<!-- 背景應用程式設定 -->
+	<key>LSUIElement</key>
+	<true/>
+	
+	<key>LSBackgroundOnly</key>
+	<false/>
+	
+	<!-- 權限聲明 -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Obsidian Photos Bridge 需要存取您的照片庫，以便在 Obsidian 中顯示和插入照片。此應用程式不會上傳或分享您的照片，所有處理都在本機進行。</string>
+	
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>此應用程式可能需要將處理後的照片儲存到照片庫中。</string>
+	
+	<!-- 網路設定 -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+	</dict>
+	
+	<!-- 支援的文件類型 -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>jpg</string>
+				<string>jpeg</string>
+				<string>png</string>
+				<string>heic</string>
+				<string>heif</string>
+				<string>gif</string>
+				<string>tiff</string>
+				<string>tif</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Image Files</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>mov</string>
+				<string>mp4</string>
+				<string>m4v</string>
+				<string>avi</string>
+				<string>mkv</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Video Files</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+		</dict>
+	</array>
+	
+	<!-- 支援的 URL Schemes -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.obsidian.photos-bridge.url</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>obsidian-photos-bridge</string>
+			</array>
+		</dict>
+	</array>
+	
+	<!-- 應用程式類別 -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	
+	<!-- 版權資訊 -->
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2024 Obsidian Photos Bridge Team. All rights reserved.</string>
+	
+	<!-- 支援的架構 -->
+	<key>LSArchitecturePriority</key>
+	<array>
+		<string>arm64</string>
+		<string>x86_64</string>
+	</array>
+	
+	<!-- 沙盒設定 -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	
+	<!-- 如果啟用沙盒，需要這些權限 -->
+	<!--
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	
+	<key>com.apple.security.assets.photos.read-write</key>
+	<true/>
+	
+	<key>com.apple.security.network.server</key>
+	<true/>
+	
+	<key>com.apple.security.network.client</key>
+	<true/>
+	-->
+	
+	<!-- 高解析度支援 -->
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	
+	<!-- 支援深色模式 -->
+	<key>NSRequiresAquaSystemAppearance</key>
+	<false/>
+	
+	<!-- 主要執行緒檢查 -->
+	<key>NSMainThreadLookupEnabled</key>
+	<true/>
+	
+	<!-- 電池與效能 -->
+	<key>LSLaunchOnlyOnce</key>
+	<false/>
+	
+	<key>LSMultipleInstancesProhibited</key>
+	<true/>
+</dict>
+</plist> 
