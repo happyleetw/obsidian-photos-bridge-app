@@ -5,8 +5,11 @@ import AppKit
 class ObsidianPhotosBridgeApp {
     private let photosManager = PhotosManager.shared
     private let apiServer = APIServer.shared
+    private var isGUIMode = false
     
-    func run() {
+    func run(guiMode: Bool = false) {
+        self.isGUIMode = guiMode
+        
         print("🚀 Obsidian Photos Bridge App Starting...")
         print("📸 Version: 1.0.0")
         print("🔒 Privacy: All operations are local-only")
@@ -20,8 +23,10 @@ class ObsidianPhotosBridgeApp {
         // Start API server
         startAPIServer()
         
-        // Keep the app running
-        RunLoop.main.run()
+        // Keep the app running (only in CLI mode)
+        if !isGUIMode {
+            RunLoop.main.run()
+        }
     }
     
     private func requestPhotosPermission() async {
@@ -118,6 +123,83 @@ class ObsidianPhotosBridgeApp {
     }
 }
 
-// Main function
-let app = ObsidianPhotosBridgeApp()
-app.run() 
+// Menu Bar App Wrapper
+class MenuBarApp: NSObject, NSApplicationDelegate {
+    private var statusItem: NSStatusItem?
+    private let bridgeApp = ObsidianPhotosBridgeApp()
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Setup menu bar icon
+        setupMenuBar()
+        
+        // Hide dock icon (makes it a menu bar only app)
+        NSApp.setActivationPolicy(.accessory)
+        
+        // Run the original bridge app logic in GUI mode
+        bridgeApp.run(guiMode: true)
+    }
+    
+    private func setupMenuBar() {
+        // Create status item in menu bar
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        
+        if let button = statusItem?.button {
+            // Set icon (using SF Symbol)
+            button.image = NSImage(systemSymbolName: "photo.on.rectangle", accessibilityDescription: "Obsidian Photos Bridge")
+            button.image?.isTemplate = true
+        }
+        
+        // Create menu
+        let menu = NSMenu()
+        
+        // Title
+        let titleItem = NSMenuItem()
+        titleItem.title = "Obsidian Photos Bridge"
+        titleItem.isEnabled = false
+        menu.addItem(titleItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // API URL
+        let apiItem = NSMenuItem()
+        apiItem.title = "API: http://localhost:44556"
+        apiItem.action = #selector(copyAPIUrl)
+        apiItem.target = self
+        menu.addItem(apiItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Quit
+        let quitItem = NSMenuItem()
+        quitItem.title = "Quit"
+        quitItem.action = #selector(quit)
+        quitItem.target = self
+        quitItem.keyEquivalent = "q"
+        menu.addItem(quitItem)
+        
+        statusItem?.menu = menu
+    }
+    
+    @objc private func copyAPIUrl() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString("http://localhost:44556", forType: .string)
+    }
+    
+    @objc private func quit() {
+        NSApplication.shared.terminate(nil)
+    }
+}
+
+// Main function - choose between GUI and CLI
+if ProcessInfo.processInfo.environment["GUI_MODE"] != "false" {
+    // GUI Mode - with menu bar icon
+    let app = NSApplication.shared
+    let delegate = MenuBarApp()
+    app.delegate = delegate
+    app.run()
+} else {
+    // CLI Mode - original behavior
+    let app = ObsidianPhotosBridgeApp()
+    app.run()
+} 
