@@ -60,6 +60,11 @@ class APIServer {
             return self.handleSearchPhotos(request: request)
         }
         
+        // Get photos by date
+        webServer.addHandler(forMethod: "GET", path: "/api/photos/date", request: GCDWebServerRequest.self) { request in
+            return self.handleGetPhotosByDate(request: request)
+        }
+        
         // Get thumbnail
         webServer.addHandler(forMethod: "GET", pathRegex: "^/api/thumbnails/(.+)$", request: GCDWebServerRequest.self) { request in
             return self.handleGetThumbnail(request: request)
@@ -133,6 +138,29 @@ class APIServer {
         let pageSize = min(Int(request.query?["pageSize"] as? String ?? "50") ?? 50, 200)
         
         let response = photosManager.searchPhotos(query: query, page: page, pageSize: pageSize)
+        
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let jsonData = try encoder.encode(response)
+            
+            let httpResponse = GCDWebServerDataResponse(data: jsonData, contentType: "application/json")
+            httpResponse.setValue("*", forAdditionalHeader: "Access-Control-Allow-Origin")
+            return httpResponse
+        } catch {
+            return createErrorResponse(message: "Failed to encode response: \(error.localizedDescription)")
+        }
+    }
+    
+    private func handleGetPhotosByDate(request: GCDWebServerRequest) -> GCDWebServerResponse? {
+        guard let dateString = request.query?["date"] as? String, !dateString.isEmpty else {
+            return createErrorResponse(message: "Missing or empty date parameter (format: YYYY/MM/DD)")
+        }
+        
+        let page = Int(request.query?["page"] as? String ?? "1") ?? 1
+        let pageSize = min(Int(request.query?["pageSize"] as? String ?? "50") ?? 50, 200)
+        
+        let response = photosManager.getPhotosByDate(dateString: dateString, page: page, pageSize: pageSize)
         
         do {
             let encoder = JSONEncoder()
