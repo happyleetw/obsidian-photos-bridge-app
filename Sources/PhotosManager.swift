@@ -8,6 +8,7 @@ class PhotosManager: NSObject {
     private var allPhotos: PHFetchResult<PHAsset>?
     private let imageManager = PHCachingImageManager()
     private let thumbnailSize = CGSize(width: 200, height: 200)
+    private var lastLoadTime: Date?
     
     private override init() {
         super.init()
@@ -53,7 +54,8 @@ class PhotosManager: NSObject {
         // includeAllBurstPhotos is not available in newer iOS/macOS versions
         
         allPhotos = PHAsset.fetchAssets(with: fetchOptions)
-        print("Loaded \(allPhotos?.count ?? 0) photos")
+        lastLoadTime = Date()
+        print("Loaded \(allPhotos?.count ?? 0) photos at \(lastLoadTime!)")
     }
     
     // Add a public method to load photos from main thread
@@ -62,9 +64,26 @@ class PhotosManager: NSObject {
         loadPhotos()
     }
     
+    // Check if photos should be automatically reloaded (e.g., if they're older than 5 minutes)
+    private func shouldAutoReload() -> Bool {
+        guard let lastLoadTime = lastLoadTime else { return true }
+        let timeSinceLastLoad = Date().timeIntervalSince(lastLoadTime)
+        let autoReloadThreshold: TimeInterval = 5 * 60 // 5 minutes
+        return timeSinceLastLoad > autoReloadThreshold
+    }
+    
     // MARK: - Public API
     
-    func getPhotos(page: Int = 1, pageSize: Int = 50, mediaType: PHAssetMediaType? = nil) -> PhotosResponse {
+    func getPhotos(page: Int = 1, pageSize: Int = 50, mediaType: PHAssetMediaType? = nil, forceReload: Bool = false) -> PhotosResponse {
+        // Check if we need to reload photos
+        let shouldReload = forceReload || allPhotos == nil || shouldAutoReload()
+        
+        if shouldReload {
+            Task { @MainActor in
+                loadPhotos()
+            }
+        }
+        
         guard let allPhotos = allPhotos else {
             return PhotosResponse(photos: [], total: 0, page: page, pageSize: pageSize, hasMore: false)
         }
@@ -157,32 +176,93 @@ class PhotosManager: NSObject {
     // MARK: - Image Processing
     
     func getThumbnail(for asset: PHAsset, completion: @escaping (Data?) -> Void) {
-        let options = PHImageRequestOptions()
-        options.isSynchronous = false
-        options.deliveryMode = .highQualityFormat
-        options.resizeMode = .exact
+        // First attempt: try high quality format for best results
+        let highQualityOptions = PHImageRequestOptions()
+        highQualityOptions.isSynchronous = false
+        highQualityOptions.deliveryMode = .highQualityFormat
+        highQualityOptions.resizeMode = .exact
+        highQualityOptions.isNetworkAccessAllowed = true
+        
+        var hasCompleted = false
+        var requestID: PHImageRequestID = 0
+        
+        // Set up a timeout mechanism
+        let timeoutWork = DispatchWorkItem { [weak self] in
+            if !hasCompleted {
+                hasCompleted = true
+                print("High quality thumbnail request timed out for asset \(asset.localIdentifier), trying opportunistic mode")
+                // Cancel the ongoing request
+                self?.imageManager.cancelImageRequest(requestID)
+                // Try opportunistic mode as fallback
+                self?.getThumbnailWithOpportunisticMode(for: asset, completion: completion)
+            }
+        }
+        
+        // Execute timeout after 8 seconds
+        DispatchQueue.global().asyncAfter(deadline: .now() + 8.0, execute: timeoutWork)
+        
+        requestID = imageManager.requestImage(
+            for: asset,
+            targetSize: thumbnailSize,
+            contentMode: .aspectFill,
+            options: highQualityOptions
+        ) { [weak self] image, info in
+            guard !hasCompleted else { return }
+            
+            // Check if the request was successful and we got a good quality image
+            let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
+            let isError = info?[PHImageErrorKey] != nil
+            let isCancelled = info?[PHImageCancelledKey] as? Bool ?? false
+            
+            if let image = image, !isDegraded && !isError && !isCancelled {
+                // Success with high quality image
+                hasCompleted = true
+                timeoutWork.cancel() // Cancel the timeout
+                self?.convertImageToJPEGData(image, completion: completion)
+            } else if isError || isCancelled {
+                // High quality request failed, try opportunistic mode as fallback
+                hasCompleted = true
+                timeoutWork.cancel() // Cancel the timeout
+                print("High quality thumbnail failed for asset \(asset.localIdentifier), trying opportunistic mode")
+                self?.getThumbnailWithOpportunisticMode(for: asset, completion: completion)
+            }
+            // If it's just degraded but not final, wait for the next callback
+        }
+    }
+    
+    // Fallback method using opportunistic mode for problematic assets
+    private func getThumbnailWithOpportunisticMode(for asset: PHAsset, completion: @escaping (Data?) -> Void) {
+        let opportunisticOptions = PHImageRequestOptions()
+        opportunisticOptions.isSynchronous = false
+        opportunisticOptions.deliveryMode = .opportunistic
+        opportunisticOptions.resizeMode = .exact
+        opportunisticOptions.isNetworkAccessAllowed = true
         
         imageManager.requestImage(
             for: asset,
             targetSize: thumbnailSize,
             contentMode: .aspectFill,
-            options: options
-        ) { image, _ in
-            guard let image = image else {
+            options: opportunisticOptions
+        ) { [weak self] image, _ in
+            if let image = image {
+                self?.convertImageToJPEGData(image, completion: completion)
+            } else {
+                print("Failed to generate thumbnail for asset \(asset.localIdentifier)")
                 completion(nil)
-                return
             }
-            
-            // Convert NSImage to Data
-            guard let tiffData = image.tiffRepresentation,
-                  let bitmapImage = NSBitmapImageRep(data: tiffData),
-                  let jpegData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
-                completion(nil)
-                return
-            }
-            
-            completion(jpegData)
         }
+    }
+    
+    // Helper method to convert NSImage to JPEG data
+    private func convertImageToJPEGData(_ image: NSImage, completion: @escaping (Data?) -> Void) {
+        guard let tiffData = image.tiffRepresentation,
+              let bitmapImage = NSBitmapImageRep(data: tiffData),
+              let jpegData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
+            completion(nil)
+            return
+        }
+        
+        completion(jpegData)
     }
     
     func getOriginalImageData(for asset: PHAsset, completion: @escaping (Data?, String?) -> Void) {

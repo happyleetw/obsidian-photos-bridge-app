@@ -98,6 +98,9 @@ class APIServer {
         let page = Int(request.query?["page"] as? String ?? "1") ?? 1
         let pageSize = min(Int(request.query?["pageSize"] as? String ?? "50") ?? 50, 200) // Max 200
         
+        // Parse refresh parameter
+        let forceReload = (request.query?["refresh"] as? String)?.lowercased() == "true"
+        
         let mediaTypeString = request.query?["mediaType"] as? String
         var mediaType: PHAssetMediaType?
         
@@ -114,7 +117,7 @@ class APIServer {
             }
         }
         
-        let response = photosManager.getPhotos(page: page, pageSize: pageSize, mediaType: mediaType)
+        let response = photosManager.getPhotos(page: page, pageSize: pageSize, mediaType: mediaType, forceReload: forceReload)
         
         do {
             let encoder = JSONEncoder()

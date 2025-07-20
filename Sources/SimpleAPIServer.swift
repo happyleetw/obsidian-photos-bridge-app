@@ -170,8 +170,9 @@ class SimpleAPIServer {
         let queryParams = parseQuery(from: path)
         let page = Int(queryParams["page"] ?? "1") ?? 1
         let pageSize = min(Int(queryParams["pageSize"] ?? "50") ?? 50, 200)
+        let forceReload = queryParams["refresh"]?.lowercased() == "true"
         
-        let response = photosManager.getPhotos(page: page, pageSize: pageSize)
+        let response = photosManager.getPhotos(page: page, pageSize: pageSize, forceReload: forceReload)
         sendJSONResponse(connection: connection, data: response)
     }
     
